@@ -1,11 +1,16 @@
 """API for the AI Security Data Platform."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Query
+from fastapi.responses import FileResponse
 
 from app.database import get_connection, initialize_database
 from app.models import SecurityEvent, SecurityEventCreate
+
+
+DASHBOARD_PATH = Path(__file__).resolve().parent / "static" / "dashboard.html"
 
 
 @asynccontextmanager
@@ -37,6 +42,10 @@ def health_check() -> dict[str, str]:
     """Confirm that the API is running."""
     return {"status": "healthy"}
 
+@app.get("/dashboard", include_in_schema=False)
+def dashboard() -> FileResponse:
+    """Display the security-event dashboard."""
+    return FileResponse(DASHBOARD_PATH)
 
 @app.post("/events", response_model=SecurityEvent, status_code=201)
 def create_event(event: SecurityEventCreate) -> dict:

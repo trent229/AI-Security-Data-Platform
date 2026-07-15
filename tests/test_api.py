@@ -63,3 +63,11 @@ def test_rejects_invalid_confidence(client):
     response = client.post("/events", json=event)
 
     assert response.status_code == 422
+    
+def test_dashboard_loads(client):
+    """The dashboard should load successfully."""
+    response = client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert "AI Security Data Platform" in response.text
+    assert "Recent Security Events" in response.text
