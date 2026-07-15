@@ -3,12 +3,12 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from app.database import get_connection, initialize_database
 from app.models import SecurityEvent, SecurityEventCreate
-
+from app.analysis import analyze_event
 
 DASHBOARD_PATH = Path(__file__).resolve().parent / "static" / "dashboard.html"
 
@@ -97,3 +97,57 @@ def list_events(
         ).fetchall()
 
     return [dict(event) for event in events]
+
+@app.get("/events/analysis")
+def list_analyzed_events(
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[dict]:
+    """Return recent events with explainable risk assessments."""
+    with get_connection() as connection:
+        events = connection.execute(
+            """
+            SELECT *
+            FROM security_events
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    analyzed_events = []
+
+    for stored_event in events:
+        event = dict(stored_event)
+        assessment = analyze_event(
+            severity=event["severity"],
+            event_type=event["event_type"],
+            confidence=event["confidence"],
+        )
+        event["risk"] = assessment.to_dict()
+        analyzed_events.append(event)
+
+    return analyzed_events
+
+@app.get("/events/{event_id}/analysis")
+def analyze_stored_event(event_id: int) -> dict:
+    """Analyze one stored event and explain its risk level."""
+    with get_connection() as connection:
+        event = connection.execute(
+            "SELECT * FROM security_events WHERE id = ?",
+            (event_id,),
+        ).fetchone()
+
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    assessment = analyze_event(
+        severity=event["severity"],
+        event_type=event["event_type"],
+        confidence=event["confidence"],
+    )
+
+    return {
+        "engine": "rule-based-v1",
+        "event": dict(event),
+        "assessment": assessment.to_dict(),
+    }

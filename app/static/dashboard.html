@@ -205,6 +205,16 @@
             background: rgba(245, 196, 81, 0.12);
         }
 
+        .severity-guarded {
+        color: var(--yellow);
+        background: rgba(245, 196, 81, 0.12);
+        }
+
+        .severity-elevated {
+        color: var(--orange);
+        background: rgba(255, 138, 76, 0.12);
+        }
+
         .severity-high {
             color: var(--orange);
             background: rgba(255, 138, 76, 0.12);
@@ -293,6 +303,7 @@
                             <th>Device</th>
                             <th>Event</th>
                             <th>Severity</th>
+                            <th>Risk</th>
                             <th>Confidence</th>
                             <th>Created</th>
                         </tr>
@@ -335,9 +346,9 @@
 
             const devices = new Set(events.map((event) => event.device_id));
             const highPriority = events.filter(
-                (event) =>
-                    event.severity === "high" ||
-                    event.severity === "critical"
+            (event) =>
+            event.risk.level === "high" ||
+            event.risk.level === "critical"
             );
 
             const confidenceValues = events
@@ -372,6 +383,13 @@
                 severityCell.appendChild(severity);
                 row.appendChild(severityCell);
 
+                const riskCell = document.createElement("td");
+                const risk = document.createElement("span");
+                risk.className = `severity severity-${event.risk.level}`;
+                risk.textContent = `${event.risk.score} · ${event.risk.level}`;
+                riskCell.appendChild(risk);
+                row.appendChild(riskCell);
+
                 addCell(
                     row,
                     event.confidence === null
@@ -388,7 +406,7 @@
             statusElement.textContent = "Updating";
 
             try {
-                const response = await fetch("/events?limit=100");
+                const response = await fetch("/events/analysis?limit=100");
 
                 if (!response.ok) {
                     throw new Error(`Request failed: ${response.status}`);

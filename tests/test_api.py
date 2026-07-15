@@ -71,3 +71,49 @@ def test_dashboard_loads(client):
     assert response.status_code == 200
     assert "AI Security Data Platform" in response.text
     assert "Recent Security Events" in response.text
+    
+def test_event_risk_analysis(client):
+    """A stored event should receive an explainable risk assessment."""
+    event = {
+        "device_id": "entry-camera-test",
+        "event_type": "person_detected",
+        "severity": "high",
+        "description": "Person detected during analysis test",
+        "confidence": 0.95,
+    }
+
+    create_response = client.post("/events", json=event)
+    event_id = create_response.json()["id"]
+
+    response = client.get(f"/events/{event_id}/analysis")
+
+    assert response.status_code == 200
+
+    result = response.json()
+    assert result["engine"] == "rule-based-v1"
+    assert result["assessment"]["score"] == 89
+    assert result["assessment"]["level"] == "critical"
+    assert len(result["assessment"]["reasons"]) == 3
+    
+def test_analyzed_event_list(client):
+    """The analyzed event list should include risk information."""
+    event = {
+        "device_id": "pan-tilt-camera-test",
+        "event_type": "motion_detected",
+        "severity": "medium",
+        "description": "Motion event for analyzed-list test",
+        "confidence": 0.80,
+    }
+
+    client.post("/events", json=event)
+    response = client.get("/events/analysis")
+
+    assert response.status_code == 200
+
+    events = response.json()
+    assert len(events) == 1
+    assert events[0]["device_id"] == "pan-tilt-camera-test"
+    assert "risk" in events[0]
+    assert "score" in events[0]["risk"]
+    assert "level" in events[0]["risk"]
+    assert "reasons" in events[0]["risk"]
